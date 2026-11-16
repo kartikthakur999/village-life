@@ -1,0 +1,91 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Village Life Open World</title>
+<style>
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#9acbea;font-family:system-ui;color:#fff}canvas{display:block}#game{position:fixed;inset:0}
+#hud{position:fixed;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:5px;pointer-events:none}.chip{background:#101b;color:#fff;padding:7px 10px;border-radius:12px;font-size:12px;border:1px solid #ffffff40}
+#help{position:fixed;top:52px;left:8px;background:#101b;padding:8px 10px;border-radius:10px;font-size:11px;max-width:220px;line-height:1.4}
+#controls{position:fixed;bottom:12px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+#pad{display:grid;grid-template-columns:47px 47px 47px;grid-template-rows:47px 47px;gap:4px;pointer-events:auto}
+button{color:white;background:#142b;border:1px solid #ffffff80;border-radius:12px;font-weight:700;touch-action:none}
+.ctrl{font-size:20px}#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+#actions{display:flex;flex-direction:column;gap:6px;pointer-events:auto}.act{padding:10px 11px;font-size:11px;background:#174c2d}
+#toast{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);background:#101d;padding:9px 13px;border-radius:12px;font-size:12px;display:none;text-align:center;max-width:88%}
+#start{position:fixed;inset:0;background:linear-gradient(#102b3bbd,#07120deb);display:flex;align-items:center;justify-content:center;padding:20px}
+#box{max-width:430px;background:#15251ff0;border:1px solid #ffffff55;border-radius:20px;padding:20px;text-align:center}h1{margin:0 0 8px;color:#f4d27b}#box p{font-size:13px;line-height:1.5;color:#e4e9e4}#begin{background:#d6aa4e;color:#241b0b;border:0;padding:13px 22px;font-size:16px}
+</style></head><body><div id="game"></div>
+<div id="hud"><div class="chip" id="vehicle">🚜 पैदल</div><div class="chip" id="money">💰 ₹5,000</div><div class="chip" id="day">दिन 1</div></div>
+<div id="help">तीर से चलें · वाहन के पास जाकर <b>वाहन</b> दबाएँ · खेत में <b>जुताई</b> करें · पास के ट्रैक्टर को <b>खींचें</b></div>
+<div id="toast"></div>
+<div id="controls"><div id="pad"><button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button><button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button></div>
+<div id="actions"><button class="act" id="vehicleBtn">🚗 वाहन</button><button class="act" id="workBtn">🌱 जुताई/फसल</button><button class="act" id="towBtn">⛓️ खींचो</button><button class="act" id="switchBtn">🔁 बदलो</button></div></div>
+<div id="start"><div id="box"><h1>🌾 Village Life Open World</h1><p>20–25 घरों वाला गाँव, खेत, जंगल, दूर शहर, ट्रैक्टर, गन्ना और वाहन चलाने का शुरुआती 3D प्रोटोटाइप।</p><p><b>नोट:</b> यह पहला टेस्ट वर्जन है। वास्तविक ब्रांडेड मॉडल, पूरी मशीनरी, गियर/क्लच सिमुलेशन और विस्तृत बोरिंग अभी शामिल नहीं हैं।</p><button id="begin">गेम शुरू करें</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=>{'use strict';
+const root=document.getElementById('game'),toast=document.getElementById('toast');
+let scene,camera,renderer,player,clock,keys={},started=false,money=5000,day=1,active=null,towTarget=null,rope=null;
+const vehicles=[],fields=[],sugarcane=[];
+function say(t){toast.textContent=t;toast.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>toast.style.display='none',2300)}
+function material(c,rough=.9){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
+function mesh(geo,mat,x,y,z,parent=scene){let o=new THREE.Mesh(geo,mat);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function cube(w,h,d,c,x,y,z,parent=scene){return mesh(new THREE.BoxGeometry(w,h,d),material(c),x,y,z,parent)}
+function group(){return new THREE.Group()}
+function tree(x,z,s=1){let g=group();scene.add(g);mesh(new THREE.CylinderGeometry(.13*s,.22*s,1.5*s,7),material('#75502f'),0,.75*s,0,g);let crown=mesh(new THREE.SphereGeometry(.9*s,9,7),material('#2e7135'),0,1.8*s,0,g);crown.scale.y=1.2;g.position.set(x,0,z)}
+function house(x,z,i){let colors=['#d8bd91','#c9a77c','#e0cba7','#c99b76'];cube(4.8,2.8,4,colors[i%4],x,1.4,z);let roof=mesh(new THREE.ConeGeometry(3.7,1.8,4),material(i%2?'#914d38':'#9a5a3e'),x,3.6,z);roof.rotation.y=Math.PI/4;cube(.9,1.8,.12,'#65432e',x,0.9,z-2.05);cube(.65,.65,.08,'#7db6ca',x-1.4,1.8,z-2.08);cube(.65,.65,.08,'#7db6ca',x+1.4,1.8,z-2.08)}
+function tractor(x,z,color='#b82d24',name='Tractor'){
+ let g=group();scene.add(g);
+ // chassis, hood, cabin/seat
+ cube(1.35,.48,2.2,'#333333',0,.75,0,g);cube(1.05,.8,1.05,color,0,1.2,-.55,g);cube(.95,.5,.75,color,0,1.1,.65,g);
+ // wheels
+ for(let side of [-1,1]){let rear=mesh(new THREE.CylinderGeometry(.72,.72,.32,16),material('#222222'),side*.83,.72,.7,g);rear.rotation.z=Math.PI/2;let front=mesh(new THREE.CylinderGeometry(.43,.43,.25,14),material('#222222'),side*.72,.45,-.85,g);front.rotation.z=Math.PI/2;
+ for(let j=0;j<12;j++){let a=j*Math.PI/6;let lug=mesh(new THREE.BoxGeometry(.12,.12,.24),material('#454545'),side*.83,.72+Math.sin(a)*.69,.7+Math.cos(a)*.69,g);lug.rotation.x=a}}
+ cube(.12,1.25,.12,'#444',0,1.6,.55,g);cube(.8,.12,.8,'#343434',0,2.15,.55,g);cube(.5,.55,.08,'#6b9aab',0,1.72,.2,g);
+ let v={g,x,z,name,speed:0,kind:'tractor',color};g.position.set(x,0,z);vehicles.push(v);return v
+}
+function car(x,z,color,name,kind='car'){let g=group();scene.add(g);cube(1.8,.65,3.5,color,0,.8,0,g);cube(1.5,.7,1.65,'#8eb5c6',0,1.4,-.15,g);for(let s of [-1,1])for(let zz of [-1.1,1.1]){let w=mesh(new THREE.CylinderGeometry(.38,.38,.22,14),material('#202020'),s*.92,.4,zz,g);w.rotation.z=Math.PI/2}let v={g,x,z,name,kind,speed:0};g.position.set(x,0,z);vehicles.push(v);return v}
+function init(){
+ scene=new THREE.Scene();scene.background=new THREE.Color('#91c9e9');scene.fog=new THREE.Fog('#91c9e9',90,250);
+ camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,500);
+ renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.shadowMap.enabled=true;root.appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x65734c,2));let sun=new THREE.DirectionalLight(0xffffff,2.1);sun.position.set(-30,60,25);sun.castShadow=true;scene.add(sun);
+ mesh(new THREE.PlaneGeometry(500,500),material('#729e4d'),0,-.12,0).rotation.x=-Math.PI/2;
+ // long village road and crossroads
+ cube(7,.06,180,'#bba57b',0,0,0);cube(110,.06,6,'#bba57b',0,.01,-10);
+ // village homes 24 houses
+ for(let i=0;i<24;i++){let side=i%2?1:-1,row=Math.floor(i/2);house(side*(9+(row%3)*1.1),-55+row*4.6,i)}
+ // distant city skyline
+ for(let i=0;i<24;i++){let x=-65+i*5.6,h=8+(i*13%21);cube(3.8,h,4,'#8798a4',x,h/2,-145);for(let yy=1;yy<h-1;yy+=2)for(let xx=-1;xx<=1;xx+=1)cube(.18,.45,.08,'#f1dca1',x+xx,yy,-142.9)}
+ // forest belt on one side, not all land blocked
+ for(let i=0;i<180;i++){let x=30+Math.random()*95,z=-100+Math.random()*200;tree(x,z,.7+Math.random()*.9)}
+ for(let i=0;i<65;i++){let x=-130+Math.random()*70,z=-110+Math.random()*210;tree(x,z,.8+Math.random())}
+ // fields on opposite side
+ for(let f=0;f<4;f++){let x=-34,z=-35+f*24;cube(23,.1,19,'#815a35',x,.02,z);fields.push({x,z,done:false});}
+ // sugarcane patch with tall stalks
+ for(let i=0;i<140;i++){let x=18+Math.random()*15,z=-30+Math.random()*38;let g=group();scene.add(g);let h=2.5+Math.random()*1.5;mesh(new THREE.CylinderGeometry(.045,.06,h,6),material('#4c963e'),0,h/2,0,g);for(let k=0;k<3;k++){let leaf=mesh(new THREE.ConeGeometry(.12,1.5,5),material('#6aaa45'),0,h*.35+k*.38,0,g);leaf.rotation.z=(k-1)*.55}g.position.set(x,0,z);sugarcane.push(g)}
+ // pond
+ let water=mesh(new THREE.CircleGeometry(9,32),new THREE.MeshStandardMaterial({color:'#3f9fbd',roughness:.2,metalness:.1}),-48,.04,35);water.rotation.x=-Math.PI/2;
+ // animal shed and shop
+ cube(7,3,6,'#ad6147',12,1.5,45);cube(6,.2,5,'#8e4b38',12,3.1,45);
+ cube(6,3,4,'#c69c63',-17,1.5,-12);cube(6.5,.2,4.5,'#9b5738',-17,3.1,-12);
+ // player
+ player=group();scene.add(player);mesh(new THREE.CapsuleGeometry(.38,.8,4,8),material('#315c9b'),0,1,0,player);mesh(new THREE.SphereGeometry(.29,12,10),material('#c98f67'),0,1.72,0,player);player.position.set(0,0,18);
+ active=null;
+ tractor(-10,12,'#b52e24','Massey Ferguson style');tractor(-16,18,'#2c873b','Green tractor');tractor(22,10,'#2e65a3','Blue tractor');car(8,18,'#c6c8c8','SUV','car');car(14,18,'#d4b331','Thar style','car');car(3,25,'#333333','Bike','bike');
+ clock=new THREE.Clock();hud();animate();
+}
+function hud(){document.getElementById('money').textContent='💰 ₹'+money;document.getElementById('vehicle').textContent=active?'🚜 '+active.name:'🚶 पैदल';document.getElementById('day').textContent='दिन '+day}
+function closest(){let best=null,dmin=999;for(let v of vehicles){let d=Math.hypot(player.position.x-v.g.position.x,player.position.z-v.g.position.z);if(d<dmin){best=v;dmin=d}}return dmin<6?best:null}
+function useVehicle(){if(active){player.position.set(active.g.position.x+2,0,active.g.position.z+1);active=null;say('वाहन से उतर गए।');hud();return}let v=closest();if(!v){say('वाहन के पास जाओ।');return}active=v;say(v.name+' में बैठ गए। तीर से चलाएँ।');hud()}
+function work(){let x=active?active.g.position.x:player.position.x,z=active?active.g.position.z:player.position.z;let f=fields.find(a=>Math.abs(a.x-x)<15&&Math.abs(a.z-z)<13);if(!f){say('खेत के पास ट्रैक्टर लेकर जाओ।');return}if(active?.kind!=='tractor'){say('खेती के लिए ट्रैक्टर चाहिए।');return}if(!f.done){f.done=true;cube(21,.13,17,'#5c3b25',f.x,.12,f.z);money+=100;say('खेत की जुताई हुई! ₹100 कमाए।');}else{say('यह खेत जोता हुआ है। अगली फसल/बुवाई अगले अपडेट में।')}hud()}
+function tow(){let v=closest();if(active&&v===active){let others=vehicles.filter(a=>a!==active&&a.kind==='tractor').sort((a,b)=>Math.hypot(a.g.position.x-active.g.position.x,a.g.position.z-active.g.position.z)-Math.hypot(b.g.position.x-active.g.position.x,b.g.position.z-active.g.position.z));towTarget=others[0];if(towTarget){say(towTarget.name+' को टो करने के लिए जोड़ा।');}else say('पास में दूसरा ट्रैक्टर नहीं है।')}else if(towTarget){towTarget=null;say('टोइंग खोल दी।')}else say('पहले ट्रैक्टर में बैठें और दूसरे ट्रैक्टर के पास जाएँ।')}
+function animate(){requestAnimationFrame(animate);if(!started)return;let dt=Math.min(clock.getDelta(),.05);let speed=active?(active.kind==='tractor'?8:active.kind==='bike'?12:16):5;
+ let dx=(keys.right?1:0)-(keys.left?1:0),dz=(keys.down?1:0)-(keys.up?1:0);if(dx||dz){let l=Math.hypot(dx,dz);dx/=l;dz/=l;if(active){active.g.position.x+=dx*speed*dt;active.g.position.z+=dz*speed*dt;active.g.rotation.y=Math.atan2(dx,dz);player.position.copy(active.g.position)}else{player.position.x+=dx*speed*dt;player.position.z+=dz*speed*dt;player.rotation.y=Math.atan2(dx,dz)}}
+ if(towTarget&&active){let a=active.g.position,b=towTarget.g.position;let d=new THREE.Vector3(a.x-b.x,0,a.z-b.z);let len=d.length();if(len>3.4){d.normalize();towTarget.g.position.add(d.multiplyScalar(Math.min((len-3.4)*.9,4)*dt))}}
+ let pos=active?active.g.position:player.position;camera.position.lerp(new THREE.Vector3(pos.x,pos.y+9,pos.z+14),.08);camera.lookAt(pos.x,1,pos.z);renderer.render(scene,camera)}
+function bind(id,k){let el=document.getElementById(id);el.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>keys[k]=false))}
+['up','down','left','right'].forEach(k=>bind(k,k));
+document.getElementById('vehicleBtn').onclick=useVehicle;document.getElementById('workBtn').onclick=work;document.getElementById('towBtn').onclick=tow;document.getElementById('switchBtn').onclick=()=>{if(active){let idx=vehicles.indexOf(active);active=vehicles[(idx+1)%vehicles.length];player.position.copy(active.g.position);say('वाहन बदला: '+active.name);hud()}else{let v=closest();if(v){active=v;say(v.name+' चुना गया।');hud()}else say('किसी वाहन के पास जाएँ।')}};
+document.getElementById('begin').onclick=()=>{if(!window.THREE){say('3D इंजन लोड नहीं हुआ। इंटरनेट चालू करें।');return}document.getElementById('start').style.display='none';started=true;clock.start()};
+addEventListener('resize',()=>{if(camera){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}});
+init();
+})();
+</script></body></html>
