@@ -8,22 +8,22 @@
 button{color:white;background:#142b;border:1px solid #ffffff80;border-radius:12px;font-weight:700;touch-action:none}
 .ctrl{font-size:20px}#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
 #actions{display:flex;flex-direction:column;gap:6px;pointer-events:auto}.act{padding:10px 11px;font-size:11px;background:#174c2d}
-#toast{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);background:#101d;padding:9px 13px;border-radius:12px;font-size:12px;display:none;text-align:center;max-width:88%}
+#reticle{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);font-size:28px;color:#fff;text-shadow:0 0 5px #000;pointer-events:none;display:none}#toast{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);background:#101d;padding:9px 13px;border-radius:12px;font-size:12px;display:none;text-align:center;max-width:88%}
 #start{position:fixed;inset:0;background:linear-gradient(#102b3bbd,#07120deb);display:flex;align-items:center;justify-content:center;padding:20px}
 #box{max-width:430px;background:#15251ff0;border:1px solid #ffffff55;border-radius:20px;padding:20px;text-align:center}h1{margin:0 0 8px;color:#f4d27b}#box p{font-size:13px;line-height:1.5;color:#e4e9e4}#begin{background:#d6aa4e;color:#241b0b;border:0;padding:13px 22px;font-size:16px}
 </style></head><body><div id="game"></div>
 <div id="hud"><div class="chip" id="vehicle">🚜 पैदल</div><div class="chip" id="money">💰 ₹5,000</div><div class="chip" id="day">दिन 1</div></div>
-<div id="help">तीर से चलें · वाहन के पास जाकर <b>वाहन</b> दबाएँ · खेत में <b>जुताई</b> करें · पास के ट्रैक्टर को <b>खींचें</b></div>
-<div id="toast"></div>
+<div id="help">Move: arrows · Vehicle ke paas Vehicle dabao · Tractor se khet joto · Beej/Paani → Harvest · Animals ko chara do · Tow karo</div>
+<div id="toast"></div><div id="reticle">＋</div>
 <div id="controls"><div id="pad"><button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button><button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button></div>
-<div id="actions"><button class="act" id="vehicleBtn">🚗 वाहन</button><button class="act" id="workBtn">🌱 जुताई/फसल</button><button class="act" id="towBtn">⛓️ खींचो</button><button class="act" id="switchBtn">🔁 बदलो</button></div></div>
-<div id="start"><div id="box"><h1>🌾 Village Life Open World</h1><p>20–25 घरों वाला गाँव, खेत, जंगल, दूर शहर, ट्रैक्टर, गन्ना और वाहन चलाने का शुरुआती 3D प्रोटोटाइप।</p><p><b>नोट:</b> यह पहला टेस्ट वर्जन है। वास्तविक ब्रांडेड मॉडल, पूरी मशीनरी, गियर/क्लच सिमुलेशन और विस्तृत बोरिंग अभी शामिल नहीं हैं।</p><button id="begin">गेम शुरू करें</button></div></div>
+<div id="actions"><button class="act" id="vehicleBtn">🚗 वाहन</button><button class="act" id="workBtn">🚜 Khet ka kaam</button><button class="act" id="seedBtn">🌱 Beej / Paani</button><button class="act" id="harvestBtn">🌾 Fasal kaato</button><button class="act" id="animalBtn">🐄 Pashu ko chara</button><button class="act" id="shopBtn">🏪 Gaon ki dukaan</button><button class="act" id="towBtn">⛓️ Tow karo</button><button class="act" id="switchBtn">🔁 बदलो</button><button class="act" id="fireBtn" style="background:#8b2525">🎯 गोली</button></div></div>
+<div id="start"><div id="box"><h1>🌾 Village Life Open World</h1><p>Village Life Simulator: kheti karo, fasal ugao aur becho, pashuon ko chara do, gaon ki dukaan se samaan lo aur tractors/vehicles chalao.</p><p><b>New v3:</b> Beej bona, fasal ko paani dena, harvest, animal feeding, shop economy aur towing gameplay.</p><button id="begin">गेम शुरू करें</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 (()=>{'use strict';
 const root=document.getElementById('game'),toast=document.getElementById('toast');
-let scene,camera,renderer,player,clock,keys={},started=false,money=5000,day=1,active=null,towTarget=null,rope=null;
-const vehicles=[],fields=[],sugarcane=[];
+let scene,camera,renderer,player,clock,keys={},started=false,money=5000,day=1,active=null,towTarget=null,rope=null,targets=[],shots=[],audioCtx=null,seedStock=5,feedStock=5,animalFed=false;
+const vehicles=[],fields=[],sugarcane=[],animals=[];
 function say(t){toast.textContent=t;toast.style.display='block';clearTimeout(say.t);say.t=setTimeout(()=>toast.style.display='none',2300)}
 function material(c,rough=.9){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
 function mesh(geo,mat,x,y,z,parent=scene){let o=new THREE.Mesh(geo,mat);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
@@ -58,7 +58,7 @@ function init(){
  for(let i=0;i<180;i++){let x=30+Math.random()*95,z=-100+Math.random()*200;tree(x,z,.7+Math.random()*.9)}
  for(let i=0;i<65;i++){let x=-130+Math.random()*70,z=-110+Math.random()*210;tree(x,z,.8+Math.random())}
  // fields on opposite side
- for(let f=0;f<4;f++){let x=-34,z=-35+f*24;cube(23,.1,19,'#815a35',x,.02,z);fields.push({x,z,done:false});}
+ for(let f=0;f<4;f++){let x=-34,z=-35+f*24;cube(23,.1,19,'#815a35',x,.02,z);fields.push({x,z,done:false,planted:false,watered:false,grown:false,crop:null});}
  // sugarcane patch with tall stalks
  for(let i=0;i<140;i++){let x=18+Math.random()*15,z=-30+Math.random()*38;let g=group();scene.add(g);let h=2.5+Math.random()*1.5;mesh(new THREE.CylinderGeometry(.045,.06,h,6),material('#4c963e'),0,h/2,0,g);for(let k=0;k<3;k++){let leaf=mesh(new THREE.ConeGeometry(.12,1.5,5),material('#6aaa45'),0,h*.35+k*.38,0,g);leaf.rotation.z=(k-1)*.55}g.position.set(x,0,z);sugarcane.push(g)}
  // pond
@@ -66,25 +66,88 @@ function init(){
  // animal shed and shop
  cube(7,3,6,'#ad6147',12,1.5,45);cube(6,.2,5,'#8e4b38',12,3.1,45);
  cube(6,3,4,'#c69c63',-17,1.5,-12);cube(6.5,.2,4.5,'#9b5738',-17,3.1,-12);
+
+ // Farm animals near the animal shed: simple interactive cattle
+ function animal(x,z,type='cow'){
+   let g=group();scene.add(g);
+   let body=mesh(new THREE.BoxGeometry(1.35,.8,.65),material(type==='cow'?'#eee5d5':'#5d4632'),0,.72,0,g);
+   let head=mesh(new THREE.BoxGeometry(.48,.52,.48),material(type==='cow'?'#eee5d5':'#5d4632'),0,1.05,-.48,g);
+   for(let sx of [-.42,.42])mesh(new THREE.CylinderGeometry(.07,.08,.55,7),material('#44372c'),sx,.28,.15,g);
+   if(type==='cow'){for(let sx of [-.22,.22])mesh(new THREE.ConeGeometry(.08,.3,6),material('#eee5d5'),sx,1.4,-.48,g);}
+   g.position.set(x,0,z);animals.push({g,type,fed:false});}
+ animal(8,51,'cow');animal(15,51,'buffalo');animal(20,51,'cow');
+
+ // Safe target practice range: wooden bullseye boards only
+ for(let i=0;i<5;i++){let x=-52+i*5.5,z=54;cube(1.5,2.2,.18,'#8b5a32',x,1.1,z);for(let [col,r] of [['#f4e6c9',.72],['#c63d32',.52],['#f4e6c9',.32],['#c63d32',.14]])mesh(new THREE.CircleGeometry(r,24),new THREE.MeshStandardMaterial({color:col,side:THREE.DoubleSide}),x,1.45,z-.105);targets.push({x,y:1.45,z,hits:0});}
+ for(let i=0;i<65;i++){let x=-42+Math.random()*85,z=-85+Math.random()*165;if(Math.abs(x)<5)continue;let patch=mesh(new THREE.CircleGeometry(.4+Math.random()*.7,7),material(i%2?'#789d4e':'#83a958'),x,.006,z);patch.rotation.x=-Math.PI/2;}
  // player
  player=group();scene.add(player);mesh(new THREE.CapsuleGeometry(.38,.8,4,8),material('#315c9b'),0,1,0,player);mesh(new THREE.SphereGeometry(.29,12,10),material('#c98f67'),0,1.72,0,player);player.position.set(0,0,18);
  active=null;
  tractor(-10,12,'#b52e24','Massey Ferguson style');tractor(-16,18,'#2c873b','Green tractor');tractor(22,10,'#2e65a3','Blue tractor');car(8,18,'#c6c8c8','SUV','car');car(14,18,'#d4b331','Thar style','car');car(3,25,'#333333','Bike','bike');
  clock=new THREE.Clock();hud();animate();
 }
-function hud(){document.getElementById('money').textContent='💰 ₹'+money;document.getElementById('vehicle').textContent=active?'🚜 '+active.name:'🚶 पैदल';document.getElementById('day').textContent='दिन '+day}
+function hud(){document.getElementById('money').textContent='💰 ₹'+money;document.getElementById('vehicle').textContent=active?'🚜 '+active.name:'🚶 पैदल';document.getElementById('day').textContent='Day '+day+' | Beej '+seedStock+' | Chara '+feedStock}
 function closest(){let best=null,dmin=999;for(let v of vehicles){let d=Math.hypot(player.position.x-v.g.position.x,player.position.z-v.g.position.z);if(d<dmin){best=v;dmin=d}}return dmin<6?best:null}
 function useVehicle(){if(active){player.position.set(active.g.position.x+2,0,active.g.position.z+1);active=null;say('वाहन से उतर गए।');hud();return}let v=closest();if(!v){say('वाहन के पास जाओ।');return}active=v;say(v.name+' में बैठ गए। तीर से चलाएँ।');hud()}
-function work(){let x=active?active.g.position.x:player.position.x,z=active?active.g.position.z:player.position.z;let f=fields.find(a=>Math.abs(a.x-x)<15&&Math.abs(a.z-z)<13);if(!f){say('खेत के पास ट्रैक्टर लेकर जाओ।');return}if(active?.kind!=='tractor'){say('खेती के लिए ट्रैक्टर चाहिए।');return}if(!f.done){f.done=true;cube(21,.13,17,'#5c3b25',f.x,.12,f.z);money+=100;say('खेत की जुताई हुई! ₹100 कमाए।');}else{say('यह खेत जोता हुआ है। अगली फसल/बुवाई अगले अपडेट में।')}hud()}
+function nearbyField(){
+ let x=active?active.g.position.x:player.position.x,z=active?active.g.position.z:player.position.z;
+ return fields.find(a=>Math.abs(a.x-x)<17&&Math.abs(a.z-z)<14);
+}
+function work(){
+ let f=nearbyField();
+ if(!f){say('Khet ke paas jao.');return}
+ if(active?.kind!=='tractor'){say('Khet ki jutai ke liye tractor mein baitho.');return}
+ if(!f.done){f.done=true;cube(21,.13,17,'#5c3b25',f.x,.12,f.z);money+=50;say('Khet ki jutai ho gayi! +₹50');}
+ else say('Khet ready hai. Ab beej bo sakte ho.');
+ hud();
+}
+function plantWater(){
+ let f=nearbyField();if(!f){say('Khet ke paas jao.');return}
+ if(!f.done){say('Pehle tractor se khet ki jutai karo.');return}
+ if(!f.planted){
+  if(seedStock<=0){say('Beej khatam! Dukaan se beej kharido.');return}
+  seedStock--;f.planted=true;
+  let crop=group();scene.add(crop);f.crop=crop;
+  for(let i=0;i<48;i++){let xx=f.x-9+Math.random()*18,zz=f.z-7+Math.random()*14;let stem=mesh(new THREE.CylinderGeometry(.035,.05,.55,5),material('#5b9b37'),xx,.38,zz,crop);stem.rotation.z=(Math.random()-.5)*.2;}
+  say('Beej bo diye! Ab fasal ko paani do.');
+ }else if(!f.watered){f.watered=true;say('Fasal ko paani mil gaya. Kuch waqt baad harvest kar sakte ho.');}
+ else if(!f.grown){f.grown=true;f.crop.scale.set(1,2.5,1);say('Fasal pak gayi! Ab harvest karo.');}
+ else say('Fasal ready hai. Harvest button dabao.');
+ hud();
+}
+function harvest(){
+ let f=nearbyField();if(!f||!f.planted){say('Yahan fasal nahi lagi hai.');return}
+ if(!f.watered){say('Pehle fasal ko paani do.');return}
+ if(!f.grown){f.grown=true;f.crop.scale.set(1,2.5,1);}
+ if(f.crop)scene.remove(f.crop);f.crop=null;f.planted=false;f.watered=false;f.grown=false;f.done=false;
+ money+=450;day++;say('Fasal harvest! +₹450. Naya din shuru.');hud();
+}
+function feedAnimals(){
+ let p=active?active.g.position:player.position;
+ let a=animals.find(a=>Math.hypot(a.g.position.x-p.x,a.g.position.z-p.z)<8);
+ if(!a){say('Pashuon ke shed ke paas jao.');return}
+ if(feedStock<=0){say('Chara khatam! Dukaan se chara kharido.');return}
+ feedStock--;a.fed=true;money+=80;say(a.type+' ko chara diya. Doodh/animal product se +₹80.');hud();
+}
+function villageShop(){
+ let choice=prompt('Gaon ki dukaan:\\n1 = 5 beej (₹100)\\n2 = 5 chara (₹100)\\n3 = Dono (₹180)\\nApna option likho:');
+ if(choice==='1'&&money>=100){money-=100;seedStock+=5;say('5 beej kharide.');}
+ else if(choice==='2'&&money>=100){money-=100;feedStock+=5;say('5 chara kharida.');}
+ else if(choice==='3'&&money>=180){money-=180;seedStock+=5;feedStock+=5;say('Beej aur chara dono kharide.');}
+ else if(choice!==null)say('Paise kam hain ya option galat hai.');
+ hud();
+}
 function tow(){let v=closest();if(active&&v===active){let others=vehicles.filter(a=>a!==active&&a.kind==='tractor').sort((a,b)=>Math.hypot(a.g.position.x-active.g.position.x,a.g.position.z-active.g.position.z)-Math.hypot(b.g.position.x-active.g.position.x,b.g.position.z-active.g.position.z));towTarget=others[0];if(towTarget){say(towTarget.name+' को टो करने के लिए जोड़ा।');}else say('पास में दूसरा ट्रैक्टर नहीं है।')}else if(towTarget){towTarget=null;say('टोइंग खोल दी।')}else say('पहले ट्रैक्टर में बैठें और दूसरे ट्रैक्टर के पास जाएँ।')}
+function sound(freq,dur,type='sine',vol=.08){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();let o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,audioCtx.currentTime);g.gain.setValueAtTime(vol,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur)}catch(e){}}
+function shoot(){if(!started)return;sound(115,.16,'sawtooth',.12);sound(58,.22,'triangle',.08);let origin=active?active.g.position:player.position;let dir=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),active?active.g.rotation.y:player.rotation.y).normalize();let start=new THREE.Vector3(origin.x,1.6,origin.z).add(dir.clone().multiplyScalar(1.2));let bullet=mesh(new THREE.SphereGeometry(.09,8,6),new THREE.MeshBasicMaterial({color:'#ffd45b'}),start.x,start.y,start.z);let end=start.clone().add(dir.clone().multiplyScalar(42));shots.push({mesh:bullet,start,end,t:0});let hit=null,best=999;for(let t of targets){let tp=new THREE.Vector3(t.x,t.y,t.z),along=tp.clone().sub(start).dot(dir),closest=start.clone().add(dir.clone().multiplyScalar(along)),dist=tp.distanceTo(closest);if(along>0&&along<42&&dist<1.2&&along<best){best=along;hit=t}}if(hit){hit.hits++;sound(880,.12,'square',.12);sound(1320,.2,'sine',.08);say('🎯 निशाना लगा! Target hit')}else say('गोली चली — लकड़ी के निशाने पर लक्ष्य करो।')}
 function animate(){requestAnimationFrame(animate);if(!started)return;let dt=Math.min(clock.getDelta(),.05);let speed=active?(active.kind==='tractor'?8:active.kind==='bike'?12:16):5;
  let dx=(keys.right?1:0)-(keys.left?1:0),dz=(keys.down?1:0)-(keys.up?1:0);if(dx||dz){let l=Math.hypot(dx,dz);dx/=l;dz/=l;if(active){active.g.position.x+=dx*speed*dt;active.g.position.z+=dz*speed*dt;active.g.rotation.y=Math.atan2(dx,dz);player.position.copy(active.g.position)}else{player.position.x+=dx*speed*dt;player.position.z+=dz*speed*dt;player.rotation.y=Math.atan2(dx,dz)}}
  if(towTarget&&active){let a=active.g.position,b=towTarget.g.position;let d=new THREE.Vector3(a.x-b.x,0,a.z-b.z);let len=d.length();if(len>3.4){d.normalize();towTarget.g.position.add(d.multiplyScalar(Math.min((len-3.4)*.9,4)*dt))}}
- let pos=active?active.g.position:player.position;camera.position.lerp(new THREE.Vector3(pos.x,pos.y+9,pos.z+14),.08);camera.lookAt(pos.x,1,pos.z);renderer.render(scene,camera)}
+ for(let i=shots.length-1;i>=0;i--){let s=shots[i];s.t+=dt*2.8;s.mesh.position.lerpVectors(s.start,s.end,Math.min(s.t,1));if(s.t>=1){scene.remove(s.mesh);shots.splice(i,1)}}let pos=active?active.g.position:player.position;camera.position.lerp(new THREE.Vector3(pos.x,pos.y+9,pos.z+14),.08);camera.lookAt(pos.x,1,pos.z);renderer.render(scene,camera)}
 function bind(id,k){let el=document.getElementById(id);el.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>keys[k]=false))}
 ['up','down','left','right'].forEach(k=>bind(k,k));
-document.getElementById('vehicleBtn').onclick=useVehicle;document.getElementById('workBtn').onclick=work;document.getElementById('towBtn').onclick=tow;document.getElementById('switchBtn').onclick=()=>{if(active){let idx=vehicles.indexOf(active);active=vehicles[(idx+1)%vehicles.length];player.position.copy(active.g.position);say('वाहन बदला: '+active.name);hud()}else{let v=closest();if(v){active=v;say(v.name+' चुना गया।');hud()}else say('किसी वाहन के पास जाएँ।')}};
-document.getElementById('begin').onclick=()=>{if(!window.THREE){say('3D इंजन लोड नहीं हुआ। इंटरनेट चालू करें।');return}document.getElementById('start').style.display='none';started=true;clock.start()};
+document.getElementById('vehicleBtn').onclick=useVehicle;document.getElementById('fireBtn').onclick=shoot;document.getElementById('workBtn').onclick=work;document.getElementById('seedBtn').onclick=plantWater;document.getElementById('harvestBtn').onclick=harvest;document.getElementById('animalBtn').onclick=feedAnimals;document.getElementById('shopBtn').onclick=villageShop;document.getElementById('towBtn').onclick=tow;document.getElementById('switchBtn').onclick=()=>{if(active){let idx=vehicles.indexOf(active);active=vehicles[(idx+1)%vehicles.length];player.position.copy(active.g.position);say('वाहन बदला: '+active.name);hud()}else{let v=closest();if(v){active=v;say(v.name+' चुना गया।');hud()}else say('किसी वाहन के पास जाएँ।')}};
+document.getElementById('begin').onclick=()=>{if(!window.THREE){say('3D इंजन लोड नहीं हुआ। इंटरनेट चालू करें।');return}document.getElementById('start').style.display='none';document.getElementById('reticle').style.display='block';started=true;clock.start()};
 addEventListener('resize',()=>{if(camera){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}});
 init();
 })();
