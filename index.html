@@ -1,23 +1,23 @@
 <!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Village Life Open World</title>
 <style>
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#9acbea;font-family:system-ui;color:#fff}canvas{display:block}#game{position:fixed;inset:0}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#8fc8e8;font-family:system-ui;color:#fff}canvas{display:block}#game{position:fixed;inset:0}
 #hud{position:fixed;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:5px;pointer-events:none}.chip{background:#101b;color:#fff;padding:7px 10px;border-radius:12px;font-size:12px;border:1px solid #ffffff40}
 #help{position:fixed;top:52px;left:8px;background:#101b;padding:8px 10px;border-radius:10px;font-size:11px;max-width:220px;line-height:1.4}
 #controls{position:fixed;bottom:12px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
 #pad{display:grid;grid-template-columns:47px 47px 47px;grid-template-rows:47px 47px;gap:4px;pointer-events:auto}
 button{color:white;background:#142b;border:1px solid #ffffff80;border-radius:12px;font-weight:700;touch-action:none}
 .ctrl{font-size:20px}#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
-#actions{display:flex;flex-direction:column;gap:6px;pointer-events:auto}.act{padding:10px 11px;font-size:11px;background:#174c2d}
+#actions{display:flex;flex-direction:column;gap:6px;pointer-events:auto;max-height:72vh;overflow:auto;padding:3px}.act{padding:10px 11px;font-size:12px;background:linear-gradient(135deg,#23633b,#103b25);box-shadow:0 3px 8px #0005}
 #reticle{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%);font-size:28px;color:#fff;text-shadow:0 0 5px #000;pointer-events:none;display:none}#toast{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);background:#101d;padding:9px 13px;border-radius:12px;font-size:12px;display:none;text-align:center;max-width:88%}
 #start{position:fixed;inset:0;background:linear-gradient(#102b3bbd,#07120deb);display:flex;align-items:center;justify-content:center;padding:20px}
 #box{max-width:430px;background:#15251ff0;border:1px solid #ffffff55;border-radius:20px;padding:20px;text-align:center}h1{margin:0 0 8px;color:#f4d27b}#box p{font-size:13px;line-height:1.5;color:#e4e9e4}#begin{background:#d6aa4e;color:#241b0b;border:0;padding:13px 22px;font-size:16px}
 </style></head><body><div id="game"></div>
 <div id="hud"><div class="chip" id="vehicle">🚜 पैदल</div><div class="chip" id="money">💰 ₹5,000</div><div class="chip" id="day">दिन 1</div></div>
-<div id="help">Move: arrows · Vehicle ke paas Vehicle dabao · Tractor se khet joto · Beej/Paani → Harvest · Animals ko chara do · Tow karo</div>
+<div id="help">V4 VISUAL UPDATE · Tractor details, field furrows, fences, power poles, village sign & trailer. Arrows se chalo; vehicle ke paas Vehicle dabao.</div>
 <div id="toast"></div><div id="reticle">＋</div>
 <div id="controls"><div id="pad"><button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button><button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button></div>
 <div id="actions"><button class="act" id="vehicleBtn">🚗 वाहन</button><button class="act" id="workBtn">🚜 Khet ka kaam</button><button class="act" id="seedBtn">🌱 Beej / Paani</button><button class="act" id="harvestBtn">🌾 Fasal kaato</button><button class="act" id="animalBtn">🐄 Pashu ko chara</button><button class="act" id="shopBtn">🏪 Gaon ki dukaan</button><button class="act" id="towBtn">⛓️ Tow karo</button><button class="act" id="switchBtn">🔁 बदलो</button><button class="act" id="fireBtn" style="background:#8b2525">🎯 गोली</button></div></div>
-<div id="start"><div id="box"><h1>🌾 Village Life Open World</h1><p>Village Life Simulator: kheti karo, fasal ugao aur becho, pashuon ko chara do, gaon ki dukaan se samaan lo aur tractors/vehicles chalao.</p><p><b>New v3:</b> Beej bona, fasal ko paani dena, harvest, animal feeding, shop economy aur towing gameplay.</p><button id="begin">गेम शुरू करें</button></div></div>
+<div id="start"><div id="box"><h1>🌾 Village Life Open World</h1><p>Village Life Simulator: kheti karo, fasal ugao aur becho, pashuon ko chara do, gaon ki dukaan se samaan lo aur tractors/vehicles chalao.</p><p><b>New v4:</b> Better tractor model, field furrows, boundary fencing, village details, power lines and farm trailer. Farming cycle from v3 remains.</p><button id="begin">गेम शुरू करें</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 (()=>{'use strict';
@@ -30,15 +30,35 @@ function mesh(geo,mat,x,y,z,parent=scene){let o=new THREE.Mesh(geo,mat);o.positi
 function cube(w,h,d,c,x,y,z,parent=scene){return mesh(new THREE.BoxGeometry(w,h,d),material(c),x,y,z,parent)}
 function group(){return new THREE.Group()}
 function tree(x,z,s=1){let g=group();scene.add(g);mesh(new THREE.CylinderGeometry(.13*s,.22*s,1.5*s,7),material('#75502f'),0,.75*s,0,g);let crown=mesh(new THREE.SphereGeometry(.9*s,9,7),material('#2e7135'),0,1.8*s,0,g);crown.scale.y=1.2;g.position.set(x,0,z)}
-function house(x,z,i){let colors=['#d8bd91','#c9a77c','#e0cba7','#c99b76'];cube(4.8,2.8,4,colors[i%4],x,1.4,z);let roof=mesh(new THREE.ConeGeometry(3.7,1.8,4),material(i%2?'#914d38':'#9a5a3e'),x,3.6,z);roof.rotation.y=Math.PI/4;cube(.9,1.8,.12,'#65432e',x,0.9,z-2.05);cube(.65,.65,.08,'#7db6ca',x-1.4,1.8,z-2.08);cube(.65,.65,.08,'#7db6ca',x+1.4,1.8,z-2.08)}
+function house(x,z,i){let colors=['#d8bd91','#c9a77c','#e0cba7','#c99b76'];cube(4.8,2.8,4,colors[i%4],x,1.4,z);let roof=mesh(new THREE.ConeGeometry(3.7,1.8,4),material(i%2?'#914d38':'#9a5a3e'),x,3.6,z);roof.rotation.y=Math.PI/4;cube(.9,1.8,.12,'#65432e',x,0.9,z-2.05);cube(.65,.65,.08,'#7db6ca',x-1.4,1.8,z-2.08);cube(.65,.65,.08,'#7db6ca',x+1.4,1.8,z-2.08);cube(1.5,.18,1.1,'#9b7650',x,0.12,z-2.6);cube(1.8,.12,.12,'#67482e',x,1.05,z-2.65)}
 function tractor(x,z,color='#b82d24',name='Tractor'){
  let g=group();scene.add(g);
- // chassis, hood, cabin/seat
- cube(1.35,.48,2.2,'#333333',0,.75,0,g);cube(1.05,.8,1.05,color,0,1.2,-.55,g);cube(.95,.5,.75,color,0,1.1,.65,g);
- // wheels
- for(let side of [-1,1]){let rear=mesh(new THREE.CylinderGeometry(.72,.72,.32,16),material('#222222'),side*.83,.72,.7,g);rear.rotation.z=Math.PI/2;let front=mesh(new THREE.CylinderGeometry(.43,.43,.25,14),material('#222222'),side*.72,.45,-.85,g);front.rotation.z=Math.PI/2;
- for(let j=0;j<12;j++){let a=j*Math.PI/6;let lug=mesh(new THREE.BoxGeometry(.12,.12,.24),material('#454545'),side*.83,.72+Math.sin(a)*.69,.7+Math.cos(a)*.69,g);lug.rotation.x=a}}
- cube(.12,1.25,.12,'#444',0,1.6,.55,g);cube(.8,.12,.8,'#343434',0,2.15,.55,g);cube(.5,.55,.08,'#6b9aab',0,1.72,.2,g);
+ // Chassis, bonnet, rear fenders, engine grille
+ cube(1.45,.42,2.65,'#242424',0,.72,0,g);
+ cube(1.18,.72,1.35,color,0,1.15,-.62,g);
+ cube(1.08,.5,.72,color,0,1.03,.83,g);
+ cube(1.08,.42,.08,'#242a2c',0,1.12,-1.31,g);
+ for(let i=0;i<5;i++)cube(.035,.28,.025,'#b8b8a5',-.34+i*.17,1.12,-1.36,g);
+ // front lights
+ for(let side of [-1,1])cube(.18,.16,.08,'#ffe9a4',side*.47,1.35,-1.35,g);
+ // rear wheel guards
+ for(let side of [-1,1])cube(.18,.8,1.55,color,side*.86,1.18,.65,g);
+ // four tires with chunky tread and metal hubs
+ for(let side of [-1,1]){
+  for(let spec of [{z:.78,r:.72,y:.72},{z:-.92,r:.43,y:.43}]){
+   let tire=mesh(new THREE.CylinderGeometry(spec.r,spec.r,.34,18),material('#17191a'),side*.9,spec.y,spec.z,g);tire.rotation.z=Math.PI/2;
+   let hub=mesh(new THREE.CylinderGeometry(spec.r*.48,spec.r*.48,.36,16),material('#c5b99b'),side*.9,spec.y,spec.z,g);hub.rotation.z=Math.PI/2;
+   let cap=mesh(new THREE.CylinderGeometry(spec.r*.18,spec.r*.18,.38,12),material('#5b5b54'),side*.9,spec.y,spec.z,g);cap.rotation.z=Math.PI/2;
+   for(let j=0;j<14;j++){let ang=j*Math.PI/7;let lug=mesh(new THREE.BoxGeometry(.15,.13,.29),material('#343738'),side*.9,spec.y+Math.sin(ang)*(spec.r-.03),spec.z+Math.cos(ang)*(spec.r-.03),g);lug.rotation.x=ang;}
+  }
+ }
+ // seat, steering wheel, roll bar and exhaust
+ cube(.52,.18,.48,'#29221c',0,1.42,.45,g);
+ let bar1=mesh(new THREE.CylinderGeometry(.055,.055,1.5,8),material('#242424'),-.48,1.95,.72,g);
+ let bar2=mesh(new THREE.CylinderGeometry(.055,.055,1.5,8),material('#242424'),.48,1.95,.72,g);
+ cube(1.02,.09,.09,'#242424',0,2.68,.72,g);
+ let exhaust=mesh(new THREE.CylinderGeometry(.055,.07,.85,8),material('#303437'),-.32,1.88,-.48,g);
+ let steering=mesh(new THREE.TorusGeometry(.22,.035,6,16),material('#252525'),0,1.65,.03,g);steering.rotation.x=1.1;
  let v={g,x,z,name,speed:0,kind:'tractor',color};g.position.set(x,0,z);vehicles.push(v);return v
 }
 function car(x,z,color,name,kind='car'){let g=group();scene.add(g);cube(1.8,.65,3.5,color,0,.8,0,g);cube(1.5,.7,1.65,'#8eb5c6',0,1.4,-.15,g);for(let s of [-1,1])for(let zz of [-1.1,1.1]){let w=mesh(new THREE.CylinderGeometry(.38,.38,.22,14),material('#202020'),s*.92,.4,zz,g);w.rotation.z=Math.PI/2}let v={g,x,z,name,kind,speed:0};g.position.set(x,0,z);vehicles.push(v);return v}
@@ -59,6 +79,26 @@ function init(){
  for(let i=0;i<65;i++){let x=-130+Math.random()*70,z=-110+Math.random()*210;tree(x,z,.8+Math.random())}
  // fields on opposite side
  for(let f=0;f<4;f++){let x=-34,z=-35+f*24;cube(23,.1,19,'#815a35',x,.02,z);fields.push({x,z,done:false,planted:false,watered:false,grown:false,crop:null});}
+
+ // Furrows and field boundary fencing
+ for(let f of fields){
+  for(let r=-8;r<=8;r+=2)cube(.09,.035,17,'#9a7145',f.x+r,.09,f.z);
+  for(let edge of [-1,1]){
+   for(let k=-9;k<=9;k+=3){cube(.12,1.05,.12,'#795331',f.x+edge*11,.52,f.z+k); }
+   cube(.1,.08,19,'#b28a58',f.x+edge*11,1.02,f.z);
+  }
+ }
+ // roadside electric poles and overhead wires
+ for(let z=-70;z<=65;z+=18){
+  cube(.18,7,.18,'#6b543b',5.2,3.5,z);
+  cube(1.6,.12,.12,'#6b543b',5.2,6.7,z);
+  for(let dx of [-.55,.55])mesh(new THREE.CylinderGeometry(.025,.025,18,5),material('#34383a'),5.2+dx,6.4,z+9).rotation.x=Math.PI/2;
+ }
+ // village sign and colorful shop frontage
+ cube(4.6,1.6,.22,'#245b37',-17,4.1,-9);
+ cube(4.25,1.25,.08,'#e7d69a',-17,4.1,-8.85);
+ // decorative crop rows in sugarcane patch are retained
+
  // sugarcane patch with tall stalks
  for(let i=0;i<140;i++){let x=18+Math.random()*15,z=-30+Math.random()*38;let g=group();scene.add(g);let h=2.5+Math.random()*1.5;mesh(new THREE.CylinderGeometry(.045,.06,h,6),material('#4c963e'),0,h/2,0,g);for(let k=0;k<3;k++){let leaf=mesh(new THREE.ConeGeometry(.12,1.5,5),material('#6aaa45'),0,h*.35+k*.38,0,g);leaf.rotation.z=(k-1)*.55}g.position.set(x,0,z);sugarcane.push(g)}
  // pond
@@ -83,7 +123,7 @@ function init(){
  // player
  player=group();scene.add(player);mesh(new THREE.CapsuleGeometry(.38,.8,4,8),material('#315c9b'),0,1,0,player);mesh(new THREE.SphereGeometry(.29,12,10),material('#c98f67'),0,1.72,0,player);player.position.set(0,0,18);
  active=null;
- tractor(-10,12,'#b52e24','Massey Ferguson style');tractor(-16,18,'#2c873b','Green tractor');tractor(22,10,'#2e65a3','Blue tractor');car(8,18,'#c6c8c8','SUV','car');car(14,18,'#d4b331','Thar style','car');car(3,25,'#333333','Bike','bike');
+ tractor(-10,12,'#b52e24','Massey Ferguson style');tractor(-16,18,'#2c873b','Green tractor');tractor(22,10,'#2e65a3','Blue tractor');car(8,18,'#c6c8c8','SUV','car');car(14,18,'#d4b331','Thar style','car');car(3,25,'#333333','Bike','bike');car(-22,12,'#8b6b3d','Farm Trailer','trailer');
  clock=new THREE.Clock();hud();animate();
 }
 function hud(){document.getElementById('money').textContent='💰 ₹'+money;document.getElementById('vehicle').textContent=active?'🚜 '+active.name:'🚶 पैदल';document.getElementById('day').textContent='Day '+day+' | Beej '+seedStock+' | Chara '+feedStock}
